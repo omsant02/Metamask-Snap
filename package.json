@@ -56,5 +56,9 @@
       "@lavamoat/preinstall-always-fail": false,
       "sharp": true
     }
+  },
+  "dependencies": {
+    "@metamask/key-tree": "^9.1.2",
+    "aptos": "^1.21.0"
   }
 }
