@@ -5,7 +5,7 @@ import { deriveAptosAddress, getAptosBalance } from './aptos-utils';
 export const onRpcRequest: OnRpcRequestHandler = async ({ origin, request }) => {
   switch (request.method) {
     case 'hello':
-      return snap.request({
+      await snap.request({
         method: 'snap_dialog',
         params: {
           type: 'confirmation',
@@ -18,6 +18,7 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ origin, request }) => 
           ),
         },
       });
+      return true;
 
     case 'getAptosAddress':
       try {
@@ -33,7 +34,9 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ origin, request }) => 
         }
 
         const address = await deriveAptosAddress(bip44Entropy.privateKey);
-        return snap.request({
+        console.log("Derived Aptos address:", address); // For debugging
+
+        await snap.request({
           method: 'snap_dialog',
           params: {
             type: 'alert',
@@ -46,53 +49,65 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ origin, request }) => 
             ),
           },
         });
-      } catch (e) {
-        console.error(e);
-        return snap.request({
+
+        return address;
+      } catch (error: unknown) {
+        console.error("Error in getAptosAddress:", error);
+        await snap.request({
           method: 'snap_dialog',
           params: {
             type: 'alert',
             content: (
               <Box>
                 <Heading>Error</Heading>
-                <Text>Failed to derive Aptos address.</Text>
+                <Text>Failed to derive Aptos address: {error instanceof Error ? error.message : 'Unknown error'}</Text>
               </Box>
             ),
           },
         });
+        throw error;
       }
 
-    case 'getAptosBalance':
-      try {
-        const { address } = request.params as { address: string };
-        const balance = await getAptosBalance(address);
-        return snap.request({
-          method: 'snap_dialog',
-          params: {
-            type: 'alert',
-            content: (
-              <Box>
-                <Heading>Aptos Balance</Heading>
-                <Text>Your balance is: {balance} APT</Text>
-              </Box>
-            ),
-          },
-        });
-      } catch (e) {
-        console.error(e);
-        return snap.request({
-          method: 'snap_dialog',
-          params: {
-            type: 'alert',
-            content: (
-              <Box>
-                <Heading>Error</Heading>
-                <Text>Failed to fetch Aptos balance.</Text>
-              </Box>
-            ),
-          },
-        });
-      }
+      case 'getAptosBalance':
+        try {
+          const { address } = request.params as { address: string };
+          console.log("Fetching balance for address:", address); // For debugging
+          const balance = await getAptosBalance(address);
+          console.log("Fetched balance:", balance); // For debugging
+  
+          await snap.request({
+            method: 'snap_dialog',
+            params: {
+              type: 'alert',
+              content: (
+                <Box>
+                  <Heading>Aptos Balance</Heading>
+                  <Text>Your balance is: {balance} APT</Text>
+                  {balance === "0" && (
+                    <Text>Note: This account may not exist on the network or have no balance.</Text>
+                  )}
+                </Box>
+              ),
+            },
+          });
+  
+          return balance;
+        } catch (error: unknown) {
+          console.error("Error in getAptosBalance:", error);
+          await snap.request({
+            method: 'snap_dialog',
+            params: {
+              type: 'alert',
+              content: (
+                <Box>
+                  <Heading>Error</Heading>
+                  <Text>Failed to fetch Aptos balance: {error instanceof Error ? error.message : 'Unknown error'}</Text>
+                </Box>
+              ),
+            },
+          });
+          throw error;
+        }
 
     default:
       throw new Error('Method not found.');
